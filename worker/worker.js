@@ -5,7 +5,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>eSIM 资产与账号保号看板</title>
+    <title>eSIM 资产与加密账号看板</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -78,7 +78,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
             <i class="fa-solid fa-shield-halved text-4xl text-blue-600"></i>
         </div>
         <h2 class="text-3xl font-extrabold text-gray-900 mb-2">安全验证</h2>
-        <p class="text-gray-600 mb-8 text-sm font-medium">为保护您的卡片与账号资产，请获取验证码登录。</p>
+        <p class="text-gray-600 mb-8 text-sm font-medium">为保护您的卡片与加密账号资产，请获取验证码登录。</p>
         
         <div class="mb-6 relative">
             <input type="text" id="authCode" placeholder="输入 6 位数验证码" maxlength="6" class="w-full px-4 py-4 rounded-xl border border-gray-300/50 text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 shadow-inner placeholder-gray-400 placeholder:tracking-normal placeholder:text-base">
@@ -101,7 +101,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
                     <i class="fa-solid fa-sim-card"></i> eSIM 资产
                 </button>
                 <button onclick="switchTab('account')" id="tab-account" class="text-xl md:text-2xl font-extrabold text-gray-500 border-b-4 border-transparent hover:text-blue-500 pb-2 transition-colors flex items-center gap-2 whitespace-nowrap opacity-70">
-                    <i class="fa-solid fa-vault"></i> 账号库
+                    <i class="fa-solid fa-vault"></i> 账号库 <i class="fa-solid fa-lock text-sm opacity-50" id="tab-lock-icon"></i>
                 </button>
             </div>
             
@@ -118,6 +118,9 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 <!-- 账号库 面板按钮 (默认隐藏) -->
                 <button id="btn-add-account" onclick="openAccountModal()" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-full font-bold shadow-lg transition-colors flex items-center gap-2">
                     <i class="fa-solid fa-plus"></i> 添加账号
+                </button>
+                <button id="btn-lock-vault" onclick="lockVault()" class="hidden bg-gray-600 hover:bg-gray-700 text-white px-4 py-2.5 rounded-full font-bold shadow-lg transition-colors flex items-center gap-2" title="立即锁定保险库">
+                    <i class="fa-solid fa-lock"></i>
                 </button>
 
                 <button onclick="logout()" class="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2.5 rounded-full font-bold shadow-sm transition-colors flex items-center gap-2 border border-red-200" title="退出登录">
@@ -140,14 +143,37 @@ const HTML_CONTENT = `<!DOCTYPE html>
 
         <!-- ================= 账号库 视图 ================= -->
         <div id="view-account" class="hidden">
-            <div class="mb-4 text-sm text-gray-600 flex items-center gap-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100">
-                <i class="fa-solid fa-circle-info text-indigo-400"></i>
-                <span>此面板用于安全记录关联平台的账号信息，密码已做掩码隐藏处理，支持一键复制。</span>
+            <!-- 锁定界面 -->
+            <div id="vault-locked" class="max-w-md mx-auto glass-card rounded-3xl p-8 text-center mt-10 shadow-xl border-t-4 border-t-indigo-500">
+                <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+                    <i class="fa-solid fa-shield-halved text-3xl text-indigo-600"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-3">端到端加密保险库</h3>
+                <p class="text-gray-600 text-sm mb-6 leading-relaxed">您的密码将被 <strong>AES-GCM 算法</strong> 在本地高强度加密。云端仅存储不可读的密文，实现零知识安全。</p>
+                <div class="mb-4 relative">
+                    <input type="password" id="vaultPassword" placeholder="输入或设置保险库主密码" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/80 shadow-inner text-center tracking-widest font-mono placeholder:tracking-normal placeholder:font-sans">
+                </div>
+                <button id="unlockVaultBtn" onclick="unlockVault()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-key"></i> 本地派生密钥并解锁
+                </button>
+                <div class="mt-6 p-3 bg-red-50 rounded-lg border border-red-100">
+                    <p class="text-xs text-red-600 font-medium"><i class="fa-solid fa-triangle-exclamation mr-1"></i> <strong>极度重要：</strong>若遗忘此主密码，所有记录的账号密码将永久无法解密（不可逆）！</p>
+                </div>
             </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="account-container">
-                <div class="col-span-full text-center py-10 text-gray-700 font-medium text-lg">
-                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在读取账号数据...
+
+            <!-- 解锁后的界面 -->
+            <div id="vault-unlocked" class="hidden">
+                <div class="mb-6 text-sm text-green-700 flex items-center justify-between bg-green-50/80 p-3 rounded-xl border border-green-200 shadow-sm backdrop-blur-sm">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-lock-open text-green-600 text-lg"></i>
+                        <span>保险库已成功解密。<span class="hidden md:inline">密码在您的设备本地解密，传输与存储均为极高安全的 AES 密文。</span></span>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="account-container">
+                    <div class="col-span-full text-center py-10 text-gray-700 font-medium text-lg">
+                        <i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在读取并解密账号数据...
+                    </div>
                 </div>
             </div>
         </div>
@@ -222,7 +248,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 <i class="fa-solid fa-xmark"></i>
             </button>
             <h3 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2" id="accountModalTitle">
-                <i class="fa-solid fa-vault text-indigo-600"></i> 新增账号
+                <i class="fa-solid fa-vault text-indigo-600"></i> 新增加密账号
             </h3>
             
             <form id="accountForm" onsubmit="submitAccountForm(event)">
@@ -235,21 +261,21 @@ const HTML_CONTENT = `<!DOCTYPE html>
                     <input type="text" id="accAccount" required placeholder="例如：user@example.com" class="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/80">
                 </div>
                 <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">密码 (选填)</label>
+                    <label class="block text-gray-700 text-sm font-bold mb-2 flex items-center gap-1">密码 (选填) <i class="fa-solid fa-shield-halved text-green-500 text-xs" title="此字段将端到端加密"></i></label>
                     <div class="relative">
-                        <input type="password" id="accPassword" placeholder="输入密码" class="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/80">
+                        <input type="password" id="accPassword" placeholder="将被 AES-GCM 加密保护" class="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/80 font-mono">
                         <button type="button" onclick="togglePasswordVisibility('accPassword', 'accPwdIcon')" class="absolute right-3 top-2.5 text-gray-400 hover:text-indigo-600">
                             <i id="accPwdIcon" class="fa-solid fa-eye-slash"></i>
                         </button>
                     </div>
                 </div>
                 <div class="mb-6">
-                    <label class="block text-gray-700 text-sm font-bold mb-2">备注选项 (选填)</label>
+                    <label class="block text-gray-700 text-sm font-bold mb-2">备注选项 (明文，选填)</label>
                     <textarea id="accRemark" placeholder="例如：使用某个手机号注册，辅助邮箱等..." rows="3" class="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/80"></textarea>
                 </div>
                 
-                <button type="submit" id="submitAccountBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-colors">
-                    保存账号
+                <button type="submit" id="submitAccountBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-colors flex justify-center items-center gap-2">
+                    <i class="fa-solid fa-lock"></i> 加密并保存
                 </button>
             </form>
         </div>
@@ -287,7 +313,81 @@ const HTML_CONTENT = `<!DOCTYPE html>
         let editingAccountId = null;
         let currentTab = 'esim';
 
-        // 工具函数：防注入转义
+        // ================= 端到端加密 (E2EE) 核心逻辑 =================
+        let vaultMasterKey = null; // 内存中保存的 AES-GCM 密钥，刷新即焚
+        const VAULT_SALT = new TextEncoder().encode("ESIM_VAULT_SECURE_SALT"); // 固定 Salt
+
+        // ArrayBuffer 转 Base64
+        function bufferToBase64(buf) {
+            let binary = '';
+            let bytes = new Uint8Array(buf);
+            let len = bytes.byteLength;
+            for (let i = 0; i < len; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return window.btoa(binary);
+        }
+
+        // Base64 转 ArrayBuffer
+        function base64ToBuffer(base64) {
+            let binary_string = window.atob(base64);
+            let len = binary_string.length;
+            let bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binary_string.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        // 派生加密密钥
+        async function deriveCryptoKey(password) {
+            const enc = new TextEncoder();
+            const keyMaterial = await window.crypto.subtle.importKey(
+                "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveBits", "deriveKey"]
+            );
+            return window.crypto.subtle.deriveKey(
+                { name: "PBKDF2", salt: VAULT_SALT, iterations: 100000, hash: "SHA-256" },
+                keyMaterial, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+            );
+        }
+
+        // 加密字符串
+        async function encryptString(plainText, key) {
+            if (!plainText) return "";
+            try {
+                const enc = new TextEncoder();
+                const iv = window.crypto.getRandomValues(new Uint8Array(12));
+                const cipherBuffer = await window.crypto.subtle.encrypt(
+                    { name: "AES-GCM", iv: iv }, key, enc.encode(plainText)
+                );
+                const ivBase64 = bufferToBase64(iv);
+                const cipherBase64 = bufferToBase64(cipherBuffer);
+                return \`AES-GCM:\${ivBase64}:\${cipherBase64}\`;
+            } catch (e) {
+                console.error("加密失败", e);
+                throw new Error("加密失败");
+            }
+        }
+
+        // 解密字符串
+        async function decryptString(encryptedText, key) {
+            if (!encryptedText) return "";
+            if (!encryptedText.startsWith("AES-GCM:")) return encryptedText; // 兼容未加密的旧数据
+            try {
+                const parts = encryptedText.split(":");
+                const iv = new Uint8Array(base64ToBuffer(parts[1]));
+                const cipher = base64ToBuffer(parts[2]);
+                const plainBuffer = await window.crypto.subtle.decrypt(
+                    { name: "AES-GCM", iv: iv }, key, cipher
+                );
+                return new TextDecoder().decode(plainBuffer);
+            } catch (e) {
+                console.error("解密失败", e);
+                return "🔒解密失败(主密码错误)";
+            }
+        }
+
+        // ================= 工具函数 =================
         function escapeHtml(unsafe) {
             return (unsafe || "").toString()
                  .replace(/&/g, "&amp;")
@@ -297,7 +397,6 @@ const HTML_CONTENT = `<!DOCTYPE html>
                  .replace(/'/g, "&#039;");
         }
 
-        // 工具函数：Toast 提示
         function showToast(message) {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -315,14 +414,13 @@ const HTML_CONTENT = `<!DOCTYPE html>
         // 标签页切换逻辑
         function switchTab(tab) {
             currentTab = tab;
-            
-            // 按钮样式处理
             const tabEsim = document.getElementById('tab-esim');
             const tabAccount = document.getElementById('tab-account');
             const viewEsim = document.getElementById('view-esim');
             const viewAccount = document.getElementById('view-account');
             const btnAddEsim = document.getElementById('btn-add-esim');
             const btnAddAccount = document.getElementById('btn-add-account');
+            const btnLockVault = document.getElementById('btn-lock-vault');
 
             if(tab === 'esim') {
                 tabEsim.className = "text-xl md:text-2xl font-extrabold text-blue-700 border-b-4 border-blue-600 pb-2 transition-colors flex items-center gap-2 whitespace-nowrap";
@@ -334,6 +432,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 
                 btnAddEsim.classList.remove('hidden');
                 btnAddAccount.classList.add('hidden');
+                btnLockVault.classList.add('hidden');
             } else {
                 tabAccount.className = "text-xl md:text-2xl font-extrabold text-indigo-700 border-b-4 border-indigo-600 pb-2 transition-colors flex items-center gap-2 whitespace-nowrap";
                 tabEsim.className = "text-xl md:text-2xl font-extrabold text-gray-500 border-b-4 border-transparent hover:text-indigo-500 pb-2 transition-colors flex items-center gap-2 whitespace-nowrap opacity-70";
@@ -342,8 +441,16 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 viewEsim.classList.remove('block');
                 viewEsim.classList.add('hidden');
                 
-                btnAddAccount.classList.remove('hidden');
                 btnAddEsim.classList.add('hidden');
+                
+                // 判断保险库是否已解锁
+                if (vaultMasterKey) {
+                    btnAddAccount.classList.remove('hidden');
+                    btnLockVault.classList.remove('hidden');
+                } else {
+                    btnAddAccount.classList.add('hidden');
+                    btnLockVault.classList.add('hidden');
+                }
             }
         }
 
@@ -518,6 +625,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
             localStorage.removeItem('esim_auth_token');
             document.getElementById('login-container').classList.remove('hidden');
             document.getElementById('main-container').classList.add('hidden');
+            lockVault(); // 退出时顺便锁定
         }
 
         // ================= 数据加载总控 =================
@@ -526,7 +634,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
             document.getElementById('main-container').classList.remove('hidden');
             
             await fetchEsimData();
-            await fetchAccountData();
+            // 注意：账号库数据只有在输入主密码解锁后才会获取，避免在后台驻留加密字符串
         }
 
         // ================= eSIM 核心业务功能 =================
@@ -755,7 +863,49 @@ const HTML_CONTENT = `<!DOCTYPE html>
             }
         }
 
-        // ================= 新增：账号库核心业务功能 =================
+        // ================= 加密保险库控制逻辑 =================
+        async function unlockVault() {
+            const pwdInput = document.getElementById('vaultPassword').value;
+            if (!pwdInput) return alert("保险库密码不能为空！");
+            
+            const btn = document.getElementById('unlockVaultBtn');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 派生密钥中...';
+            btn.disabled = true;
+
+            try {
+                // 派生主密钥保存在内存中
+                vaultMasterKey = await deriveCryptoKey(pwdInput);
+                document.getElementById('vaultPassword').value = '';
+                
+                // 切换UI状态
+                document.getElementById('vault-locked').classList.add('hidden');
+                document.getElementById('vault-unlocked').classList.remove('hidden');
+                document.getElementById('btn-lock-vault').classList.remove('hidden');
+                document.getElementById('btn-add-account').classList.remove('hidden');
+                document.getElementById('tab-lock-icon').className = "fa-solid fa-lock-open text-sm text-green-500 opacity-80";
+                
+                showToast("密钥派生成功，正在解密...");
+                await fetchAccountData();
+            } catch (e) {
+                console.error(e);
+                alert("解锁发生错误");
+            } finally {
+                btn.innerHTML = '<i class="fa-solid fa-key"></i> 本地派生密钥并解锁';
+                btn.disabled = false;
+            }
+        }
+
+        function lockVault() {
+            vaultMasterKey = null; // 销毁内存中的密钥
+            document.getElementById('vault-locked').classList.remove('hidden');
+            document.getElementById('vault-unlocked').classList.add('hidden');
+            document.getElementById('btn-lock-vault').classList.add('hidden');
+            document.getElementById('btn-add-account').classList.add('hidden');
+            document.getElementById('account-container').innerHTML = ''; // 清除 DOM 中的加密数据
+            document.getElementById('tab-lock-icon').className = "fa-solid fa-lock text-sm opacity-50";
+            
+            showToast("保险库已锁定，密钥已从内存销毁");
+        }
 
         // 密码相关操作
         function togglePasswordVisibility(inputId, iconId) {
@@ -770,17 +920,20 @@ const HTML_CONTENT = `<!DOCTYPE html>
             }
         }
 
-        function toggleDisplayPassword(id) {
+        async function toggleDisplayPassword(id) {
             const span = document.getElementById('pwd-val-' + id);
             const icon = document.getElementById('pwd-icon-' + id);
-            const realPwd = span.getAttribute('data-pwd');
+            const encPwd = span.getAttribute('data-enc-pwd');
             
             if (span.innerText === '••••••••') {
+                const realPwd = await decryptString(encPwd, vaultMasterKey);
                 span.innerText = realPwd || '无密码';
                 icon.className = "fa-solid fa-eye text-indigo-600";
+                if(realPwd.includes('解密失败')) span.classList.add('text-red-500');
             } else {
                 span.innerText = '••••••••';
                 icon.className = "fa-solid fa-eye-slash";
+                span.classList.remove('text-red-500');
             }
         }
 
@@ -807,7 +960,18 @@ const HTML_CONTENT = `<!DOCTYPE html>
             }
         }
 
+        async function copyEncryptedPassword(id) {
+            const span = document.getElementById('pwd-val-' + id);
+            const encPwd = span.getAttribute('data-enc-pwd');
+            const realPwd = await decryptString(encPwd, vaultMasterKey);
+            if (realPwd.includes('解密失败')) {
+                return showToast("解密失败，无法复制密码！");
+            }
+            copyToClipboard(realPwd, '密码');
+        }
+
         async function fetchAccountData() {
+            if (!vaultMasterKey) return; // 未解锁禁止获取
             const container = document.getElementById('account-container');
             
             try {
@@ -822,7 +986,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 container.innerHTML = \`
                     <div class="col-span-full text-center py-10">
                         <i class="fa-solid fa-triangle-exclamation text-4xl text-red-500 mb-3"></i>
-                        <p class="text-gray-600">获取账号数据失败，请刷新重试。</p>
+                        <p class="text-gray-600">获取或解密账号数据失败，请重试。</p>
                     </div>\`;
             }
         }
@@ -855,8 +1019,8 @@ const HTML_CONTENT = `<!DOCTYPE html>
                         </div>
 
                         <div class="pr-20 mb-4 flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-                                <i class="fa-solid fa-map-location-dot"></i>
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 shadow-inner">
+                                <i class="fa-solid fa-shield-halved"></i>
                             </div>
                             <h2 class="text-lg font-bold text-gray-900 truncate" title="\${escapeHtml(acc.region)}">\${escapeHtml(acc.region)}</h2>
                         </div>
@@ -875,14 +1039,14 @@ const HTML_CONTENT = `<!DOCTYPE html>
                             
                             <!-- 密码显示区 -->
                             <div>
-                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">密码</label>
+                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1">加密密码 <i class="fa-solid fa-lock text-[10px] text-green-500"></i></label>
                                 <div class="font-mono text-sm bg-white/60 px-3 py-2.5 rounded-lg flex justify-between items-center border border-gray-100 shadow-sm">
-                                    <span id="pwd-val-\${acc.id}" data-pwd="\${escapeHtml(acc.password)}" class="truncate pr-2 text-gray-800 \${acc.password ? '' : 'text-gray-400 italic'}">\${acc.password ? '••••••••' : '未设置'}</span>
+                                    <span id="pwd-val-\${acc.id}" data-enc-pwd="\${escapeHtml(acc.password)}" class="truncate pr-2 text-gray-800 \${acc.password ? '' : 'text-gray-400 italic'}">\${acc.password ? '••••••••' : '未设置'}</span>
                                     <div class="flex gap-3 shrink-0 \${!acc.password ? 'hidden' : ''}">
-                                        <button onclick="toggleDisplayPassword('\${acc.id}')" class="text-gray-400 hover:text-indigo-600 transition-colors" title="显示/隐藏密码">
+                                        <button onclick="toggleDisplayPassword('\${acc.id}')" class="text-gray-400 hover:text-indigo-600 transition-colors" title="即时解密/隐藏">
                                             <i id="pwd-icon-\${acc.id}" class="fa-solid fa-eye-slash"></i>
                                         </button>
-                                        <button onclick="copyToClipboard(document.getElementById('pwd-val-\${acc.id}').getAttribute('data-pwd'), '密码')" class="text-gray-400 hover:text-indigo-600 transition-colors" title="复制密码">
+                                        <button onclick="copyEncryptedPassword('\${acc.id}')" class="text-gray-400 hover:text-indigo-600 transition-colors" title="解密并复制">
                                             <i class="fa-regular fa-copy"></i>
                                         </button>
                                     </div>
@@ -899,7 +1063,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
 
         function openAccountModal() {
             editingAccountId = null;
-            document.getElementById('accountModalTitle').innerHTML = '<i class="fa-solid fa-vault text-indigo-600"></i> 新增账号';
+            document.getElementById('accountModalTitle').innerHTML = '<i class="fa-solid fa-vault text-indigo-600"></i> 新增加密账号';
             const modal = document.getElementById('accountModal');
             const content = document.getElementById('accountModalContent');
             document.getElementById('accountForm').reset();
@@ -915,17 +1079,24 @@ const HTML_CONTENT = `<!DOCTYPE html>
             }, 10);
         }
 
-        function openEditAccountModal(id) {
+        async function openEditAccountModal(id) {
             const acc = accountData.find(a => a.id === id);
             if (!acc) return;
             
             editingAccountId = id;
-            document.getElementById('accountModalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square text-indigo-600"></i> 编辑账号';
+            document.getElementById('accountModalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square text-indigo-600"></i> 编辑加密账号';
             
             document.getElementById('accRegion').value = acc.region || '';
             document.getElementById('accAccount').value = acc.account || '';
-            document.getElementById('accPassword').value = acc.password || '';
             document.getElementById('accRemark').value = acc.remark || '';
+            
+            // 填充前解密密码
+            let plainPwd = '';
+            if (acc.password) {
+                plainPwd = await decryptString(acc.password, vaultMasterKey);
+                if (plainPwd.includes('解密失败')) plainPwd = ''; // 防错
+            }
+            document.getElementById('accPassword').value = plainPwd;
             
             document.getElementById('accPassword').type = "password";
             document.getElementById('accPwdIcon').className = "fa-solid fa-eye-slash";
@@ -956,21 +1127,25 @@ const HTML_CONTENT = `<!DOCTYPE html>
         async function submitAccountForm(e) {
             e.preventDefault();
             const btn = document.getElementById('submitAccountBtn');
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>保存中...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>加密中...';
             btn.disabled = true;
 
-            const payload = {
-                region: document.getElementById('accRegion').value,
-                account: document.getElementById('accAccount').value,
-                password: document.getElementById('accPassword').value,
-                remark: document.getElementById('accRemark').value
-            };
-
-            if (editingAccountId) {
-                payload.id = editingAccountId;
-            }
-
             try {
+                // 拦截表单，对密码进行强加密
+                const plainPwd = document.getElementById('accPassword').value;
+                const encryptedPwd = await encryptString(plainPwd, vaultMasterKey);
+
+                const payload = {
+                    region: document.getElementById('accRegion').value,
+                    account: document.getElementById('accAccount').value,
+                    password: encryptedPwd, // 传输密文
+                    remark: document.getElementById('accRemark').value
+                };
+
+                if (editingAccountId) {
+                    payload.id = editingAccountId;
+                }
+
                 const response = await fetch(WORKER_API_ACCOUNT_URL, {
                     method: editingAccountId ? 'PUT' : 'POST', 
                     headers: getAuthHeaders(),
@@ -980,15 +1155,16 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 if (response.status === 401) { logout(); return; }
                 if (response.ok) {
                     closeAccountModal();
-                    showToast(editingAccountId ? "账号修改成功" : "账号添加成功");
+                    showToast(editingAccountId ? "账号修改成功 (已加密存储)" : "账号添加成功 (已加密存储)");
                     await fetchAccountData(); 
                 } else {
                     alert("保存失败，请检查数据。");
                 }
             } catch (error) {
-                alert("网络错误，保存失败。");
+                alert("网络错误或加密失败。");
+                console.error(error);
             } finally {
-                btn.innerHTML = '保存账号';
+                btn.innerHTML = '<i class="fa-solid fa-lock"></i> 加密并保存';
                 btn.disabled = false;
             }
         }
