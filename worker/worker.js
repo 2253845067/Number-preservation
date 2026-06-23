@@ -5,7 +5,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>eSIM 资产与保号看板</title>
+    <title>eSIM 资产与账号保号看板</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -39,16 +39,46 @@ const HTML_CONTENT = `<!DOCTYPE html>
         }
         .modal-enter { opacity: 0; transform: scale(0.9); }
         .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.3s ease; }
+        
+        /* 自定义 Toast 提示样式 */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            color: #333;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-left: 4px solid #3b82f6;
+            font-weight: 600;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
     </style>
 </head>
 <body class="text-gray-800 font-sans p-4 md:p-8 relative">
+
+    <div id="toast-container"></div>
 
     <div id="login-container" class="max-w-md mx-auto glass-panel rounded-3xl p-8 md:p-10 mt-16 md:mt-32 text-center transition-all">
         <div class="w-20 h-20 bg-white/50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
             <i class="fa-solid fa-shield-halved text-4xl text-blue-600"></i>
         </div>
         <h2 class="text-3xl font-extrabold text-gray-900 mb-2">安全验证</h2>
-        <p class="text-gray-600 mb-8 text-sm font-medium">为保护您的卡片资产，请获取验证码登录。</p>
+        <p class="text-gray-600 mb-8 text-sm font-medium">为保护您的卡片与账号资产，请获取验证码登录。</p>
         
         <div class="mb-6 relative">
             <input type="text" id="authCode" placeholder="输入 6 位数验证码" maxlength="6" class="w-full px-4 py-4 rounded-xl border border-gray-300/50 text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 shadow-inner placeholder-gray-400 placeholder:tracking-normal placeholder:text-base">
@@ -65,37 +95,65 @@ const HTML_CONTENT = `<!DOCTYPE html>
     </div>
 
     <div id="main-container" class="max-w-6xl mx-auto glass-panel rounded-3xl p-6 md:p-10 mt-4 md:mt-8 hidden">
-        <div class="flex flex-col md:flex-row justify-between items-center mb-10 border-b border-white/50 pb-6 gap-4">
-            <div>
-                <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight flex items-center gap-3">
-                    <i class="fa-solid fa-sim-card text-blue-600"></i>
-                    eSIM 保号看板
-                </h1>
-                <p class="text-gray-700 mt-2 font-medium">自动监控卡片有效期，灵活掌控每一条通知。</p>
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-white/50 pb-4 gap-4">
+            <div class="flex gap-4 md:gap-8 items-center justify-center w-full md:w-auto overflow-x-auto">
+                <button onclick="switchTab('esim')" id="tab-esim" class="text-xl md:text-2xl font-extrabold text-blue-700 border-b-4 border-blue-600 pb-2 transition-colors flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-sim-card"></i> eSIM 资产
+                </button>
+                <button onclick="switchTab('account')" id="tab-account" class="text-xl md:text-2xl font-extrabold text-gray-500 border-b-4 border-transparent hover:text-blue-500 pb-2 transition-colors flex items-center gap-2 whitespace-nowrap opacity-70">
+                    <i class="fa-solid fa-vault"></i> 账号库
+                </button>
             </div>
+            
             <div class="flex gap-3 items-center flex-wrap justify-center">
                 <span class="text-sm bg-white/50 px-4 py-2 rounded-full font-semibold shadow-sm hidden md:inline-block">
                     今日：<span id="current-date" class="text-blue-700">...</span>
                 </span>
-                <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-full font-bold shadow-lg transition-colors flex items-center gap-2">
+                
+                <!-- eSIM 面板按钮 -->
+                <button id="btn-add-esim" onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-full font-bold shadow-lg transition-colors flex items-center gap-2">
                     <i class="fa-solid fa-plus"></i> 添加号码
                 </button>
+                
+                <!-- 账号库 面板按钮 (默认隐藏) -->
+                <button id="btn-add-account" onclick="openAccountModal()" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-full font-bold shadow-lg transition-colors flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> 添加账号
+                </button>
+
                 <button onclick="logout()" class="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2.5 rounded-full font-bold shadow-sm transition-colors flex items-center gap-2 border border-red-200" title="退出登录">
                     <i class="fa-solid fa-right-from-bracket"></i>
                 </button>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10" id="stats-container">
+        <!-- ================= eSIM 视图 ================= -->
+        <div id="view-esim" class="block">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10" id="stats-container">
             </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="esim-container">
-            <div class="col-span-full text-center py-10 text-gray-700 font-medium text-lg" id="loading-text">
-                <i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在读取数据...
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="esim-container">
+                <div class="col-span-full text-center py-10 text-gray-700 font-medium text-lg" id="loading-text">
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在读取数据...
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= 账号库 视图 ================= -->
+        <div id="view-account" class="hidden">
+            <div class="mb-4 text-sm text-gray-600 flex items-center gap-2 bg-indigo-50/50 p-3 rounded-lg border border-indigo-100">
+                <i class="fa-solid fa-circle-info text-indigo-400"></i>
+                <span>此面板用于安全记录关联平台的账号信息，密码已做掩码隐藏处理，支持一键复制。</span>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="account-container">
+                <div class="col-span-full text-center py-10 text-gray-700 font-medium text-lg">
+                    <i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在读取账号数据...
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- eSIM 添加/编辑弹窗 -->
     <div id="addModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="glass-card w-full max-w-md rounded-2xl p-6 shadow-2xl relative transition-all duration-300 transform scale-95 opacity-0 max-h-[95vh] overflow-y-auto" id="modalContent">
             <button onclick="closeModal()" class="absolute top-4 right-4 text-gray-500 hover:text-red-500 text-xl z-10">
@@ -123,7 +181,6 @@ const HTML_CONTENT = `<!DOCTYPE html>
                     <input type="date" id="simExpire" required class="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/80">
                 </div>
                 
-                <!-- 新增：自定义提醒设置面板 -->
                 <div class="mb-4 p-4 rounded-xl bg-blue-50/50 border border-blue-100">
                     <h4 class="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2"><i class="fa-solid fa-bell text-blue-500"></i> 定制 Telegram 提醒规则</h4>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -158,6 +215,47 @@ const HTML_CONTENT = `<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- 账号 添加/编辑弹窗 -->
+    <div id="accountModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-md rounded-2xl p-6 shadow-2xl relative transition-all duration-300 transform scale-95 opacity-0 max-h-[95vh] overflow-y-auto" id="accountModalContent">
+            <button onclick="closeAccountModal()" class="absolute top-4 right-4 text-gray-500 hover:text-red-500 text-xl z-10">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h3 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2" id="accountModalTitle">
+                <i class="fa-solid fa-vault text-indigo-600"></i> 新增账号
+            </h3>
+            
+            <form id="accountForm" onsubmit="submitAccountForm(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">所属地区/平台 (必填)</label>
+                    <input type="text" id="accRegion" required placeholder="例如：英国 / Google" class="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/80">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">账号/用户名 (必填)</label>
+                    <input type="text" id="accAccount" required placeholder="例如：user@example.com" class="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/80">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">密码 (选填)</label>
+                    <div class="relative">
+                        <input type="password" id="accPassword" placeholder="输入密码" class="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/80">
+                        <button type="button" onclick="togglePasswordVisibility('accPassword', 'accPwdIcon')" class="absolute right-3 top-2.5 text-gray-400 hover:text-indigo-600">
+                            <i id="accPwdIcon" class="fa-solid fa-eye-slash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">备注选项 (选填)</label>
+                    <textarea id="accRemark" placeholder="例如：使用某个手机号注册，辅助邮箱等..." rows="3" class="w-full px-4 py-2 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/80"></textarea>
+                </div>
+                
+                <button type="submit" id="submitAccountBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-colors">
+                    保存账号
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 通用确认弹窗 -->
     <div id="confirmModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="glass-card w-full max-w-sm rounded-2xl p-6 shadow-2xl relative transition-all duration-300 transform scale-95 opacity-0 text-center" id="confirmModalContent">
             <div class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm" id="confirmIconBg">
@@ -180,9 +278,74 @@ const HTML_CONTENT = `<!DOCTYPE html>
     <script>
         // API 路由前缀
         const WORKER_API_URL = "/api/esims";
+        const WORKER_API_ACCOUNT_URL = "/api/accounts";
+        
         let esimData = []; 
+        let accountData = [];
         let countdownInterval;
         let editingId = null; 
+        let editingAccountId = null;
+        let currentTab = 'esim';
+
+        // 工具函数：防注入转义
+        function escapeHtml(unsafe) {
+            return (unsafe || "").toString()
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        // 工具函数：Toast 提示
+        function showToast(message) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = \`<i class="fa-solid fa-circle-check text-blue-500 mr-2"></i>\${message}\`;
+            container.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // 标签页切换逻辑
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // 按钮样式处理
+            const tabEsim = document.getElementById('tab-esim');
+            const tabAccount = document.getElementById('tab-account');
+            const viewEsim = document.getElementById('view-esim');
+            const viewAccount = document.getElementById('view-account');
+            const btnAddEsim = document.getElementById('btn-add-esim');
+            const btnAddAccount = document.getElementById('btn-add-account');
+
+            if(tab === 'esim') {
+                tabEsim.className = "text-xl md:text-2xl font-extrabold text-blue-700 border-b-4 border-blue-600 pb-2 transition-colors flex items-center gap-2 whitespace-nowrap";
+                tabAccount.className = "text-xl md:text-2xl font-extrabold text-gray-500 border-b-4 border-transparent hover:text-blue-500 pb-2 transition-colors flex items-center gap-2 whitespace-nowrap opacity-70";
+                viewEsim.classList.remove('hidden');
+                viewEsim.classList.add('block');
+                viewAccount.classList.remove('block');
+                viewAccount.classList.add('hidden');
+                
+                btnAddEsim.classList.remove('hidden');
+                btnAddAccount.classList.add('hidden');
+            } else {
+                tabAccount.className = "text-xl md:text-2xl font-extrabold text-indigo-700 border-b-4 border-indigo-600 pb-2 transition-colors flex items-center gap-2 whitespace-nowrap";
+                tabEsim.className = "text-xl md:text-2xl font-extrabold text-gray-500 border-b-4 border-transparent hover:text-indigo-500 pb-2 transition-colors flex items-center gap-2 whitespace-nowrap opacity-70";
+                viewAccount.classList.remove('hidden');
+                viewAccount.classList.add('block');
+                viewEsim.classList.remove('block');
+                viewEsim.classList.add('hidden');
+                
+                btnAddAccount.classList.remove('hidden');
+                btnAddEsim.classList.add('hidden');
+            }
+        }
 
         // ================= 全球极其全面的 SVG 国旗字典配置 =================
         const countryFlags = [
@@ -272,7 +435,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
         
         window.onload = () => {
             if (localStorage.getItem('esim_auth_token')) {
-                fetchEsimData();
+                fetchAllData();
             }
         };
 
@@ -338,7 +501,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 if (response.ok && data.success) {
                     localStorage.setItem('esim_auth_token', data.token);
                     document.getElementById('authCode').value = '';
-                    fetchEsimData();
+                    fetchAllData();
                 } else {
                     alert("登录失败: " + (data.message || "验证码错误或已过期"));
                     btn.disabled = false;
@@ -357,26 +520,26 @@ const HTML_CONTENT = `<!DOCTYPE html>
             document.getElementById('main-container').classList.add('hidden');
         }
 
-        // ================= 核心业务相关功能 =================
+        // ================= 数据加载总控 =================
+        async function fetchAllData() {
+            document.getElementById('login-container').classList.add('hidden');
+            document.getElementById('main-container').classList.remove('hidden');
+            
+            await fetchEsimData();
+            await fetchAccountData();
+        }
+
+        // ================= eSIM 核心业务功能 =================
         async function fetchEsimData() {
             const container = document.getElementById('esim-container');
             container.innerHTML = \`<div class="col-span-full text-center py-10 text-gray-700 font-medium text-lg"><i class="fa-solid fa-spinner fa-spin mr-2"></i> 正在加载数据...</div>\`;
             
             try {
                 const response = await fetch(WORKER_API_URL, { headers: getAuthHeaders() });
-                
-                if (response.status === 401) {
-                    logout();
-                    return;
-                }
-
+                if (response.status === 401) { logout(); return; }
                 if (!response.ok) throw new Error("网络请求失败");
                 
                 esimData = await response.json();
-                
-                document.getElementById('login-container').classList.add('hidden');
-                document.getElementById('main-container').classList.remove('hidden');
-                
                 renderCards(esimData);
             } catch (error) {
                 console.error("加载失败:", error);
@@ -450,7 +613,6 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 let percent = Math.min(Math.max((diffDays / 365) * 100, 0), 100);
                 const flagHTML = getCountryFlag(sim.number);
                 
-                // 自定义提醒图标显示
                 let customNotifyIcon = '';
                 if (advance !== 15 || interval !== 1 || maxCount !== 0) {
                     const countText = maxCount > 0 ? "共" + maxCount + "次" : "次数不限";
@@ -458,15 +620,13 @@ const HTML_CONTENT = `<!DOCTYPE html>
                     customNotifyIcon = '<i class="fa-solid fa-bell-sliders text-xs text-blue-400 ml-2 cursor-help" title="' + titleText + '"></i>';
                 }
 
-                // 渲染备注区域
-                const remarkHTML = sim.remark ? \`<div class="bg-blue-50/60 rounded-lg p-2.5 mb-3 text-xs text-gray-700 border border-blue-100/60 break-words leading-relaxed"><i class="fa-regular fa-comment-dots mr-1.5 text-blue-400"></i>\${sim.remark}</div>\` : '';
+                const remarkHTML = sim.remark ? \`<div class="bg-blue-50/60 rounded-lg p-2.5 mb-3 text-xs text-gray-700 border border-blue-100/60 break-words leading-relaxed"><i class="fa-regular fa-comment-dots mr-1.5 text-blue-400"></i>\${escapeHtml(sim.remark)}</div>\` : '';
 
-                // 渲染已注册平台区域
                 let platformsHTML = '';
                 if (sim.platforms && sim.platforms.trim() !== '') {
                     const pList = sim.platforms.split(/[,，\\s]+/).filter(p => p.trim() !== '');
                     if (pList.length > 0) {
-                        const badges = pList.map(p => \`<span class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm whitespace-nowrap mb-1.5 mr-1.5"><i class="fa-solid fa-hashtag mr-1 opacity-60"></i>\${p}</span>\`).join('');
+                        const badges = pList.map(p => \`<span class="inline-flex items-center px-2 py-1 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm whitespace-nowrap mb-1.5 mr-1.5"><i class="fa-solid fa-hashtag mr-1 opacity-60"></i>\${escapeHtml(p)}</span>\`).join('');
                         platformsHTML = \`<div class="mb-3">
                             <div class="flex flex-wrap">\${badges}</div>
                         </div>\`;
@@ -489,14 +649,14 @@ const HTML_CONTENT = `<!DOCTYPE html>
                         </div>
 
                         <div class="pr-28 mb-3 flex items-center">
-                            <h2 class="text-xl font-bold text-gray-900 truncate" title="\${sim.name}">\${sim.name}</h2>
+                            <h2 class="text-xl font-bold text-gray-900 truncate" title="\${escapeHtml(sim.name)}">\${escapeHtml(sim.name)}</h2>
                             \${customNotifyIcon}
                         </div>
                         
                         <div class="flex justify-between items-center mb-4 gap-2">
                             <p class="text-gray-600 font-mono text-sm flex items-center gap-2 truncate">
                                 <span class="flex items-center shrink-0">\${flagHTML}</span>
-                                <span class="truncate">\${sim.number || '未登记号码'}</span>
+                                <span class="truncate">\${escapeHtml(sim.number) || '未登记号码'}</span>
                             </p>
                             <span class="px-2.5 py-1 rounded-full text-[11px] font-bold shadow-sm whitespace-nowrap flex-shrink-0 \${badgeClass}">
                                 <i class="fa-solid \${icon} mr-1"></i>\${statusText}
@@ -525,7 +685,6 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 container.innerHTML += cardHTML;
             });
 
-            // 动态去除了原先写死的天数标记，以反映灵活的告警设置
             statsContainer.innerHTML = \`
                 <div class="glass-card rounded-2xl p-5 flex items-center justify-between border-l-4 border-l-green-500">
                     <div>
@@ -564,7 +723,6 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 platforms: document.getElementById('simPlatforms').value, 
                 remark: document.getElementById('simRemark').value,
                 expireDate: document.getElementById('simExpire').value,
-                // 新增保存提醒设置
                 notifyAdvance: document.getElementById('simNotifyAdvance').value,
                 notifyInterval: document.getElementById('simNotifyInterval').value,
                 notifyCount: document.getElementById('simNotifyCount').value
@@ -584,6 +742,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 if (response.status === 401) { logout(); return; }
                 if (response.ok) {
                     closeModal();
+                    showToast(editingId ? "修改卡片成功" : "添加卡片成功");
                     await fetchEsimData(); 
                 } else {
                     alert("保存失败，请检查数据。");
@@ -595,6 +754,285 @@ const HTML_CONTENT = `<!DOCTYPE html>
                 btn.disabled = false;
             }
         }
+
+        // ================= 新增：账号库核心业务功能 =================
+
+        // 密码相关操作
+        function togglePasswordVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (input.type === "password") {
+                input.type = "text";
+                icon.className = "fa-solid fa-eye text-indigo-600";
+            } else {
+                input.type = "password";
+                icon.className = "fa-solid fa-eye-slash";
+            }
+        }
+
+        function toggleDisplayPassword(id) {
+            const span = document.getElementById('pwd-val-' + id);
+            const icon = document.getElementById('pwd-icon-' + id);
+            const realPwd = span.getAttribute('data-pwd');
+            
+            if (span.innerText === '••••••••') {
+                span.innerText = realPwd || '无密码';
+                icon.className = "fa-solid fa-eye text-indigo-600";
+            } else {
+                span.innerText = '••••••••';
+                icon.className = "fa-solid fa-eye-slash";
+            }
+        }
+
+        function copyToClipboard(text, typeName) {
+            if (!text) return showToast("内容为空，无法复制");
+            // 使用新版 API，如果不支持回退到临时 textarea (针对iframe环境优化)
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => showToast(typeName + "已复制到剪贴板"));
+            } else {
+                let textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast(typeName + "已复制到剪贴板");
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+
+        async function fetchAccountData() {
+            const container = document.getElementById('account-container');
+            
+            try {
+                const response = await fetch(WORKER_API_ACCOUNT_URL, { headers: getAuthHeaders() });
+                if (response.status === 401) return;
+                if (!response.ok) throw new Error("网络请求失败");
+                
+                accountData = await response.json();
+                renderAccountCards(accountData);
+            } catch (error) {
+                console.error("加载账号数据失败:", error);
+                container.innerHTML = \`
+                    <div class="col-span-full text-center py-10">
+                        <i class="fa-solid fa-triangle-exclamation text-4xl text-red-500 mb-3"></i>
+                        <p class="text-gray-600">获取账号数据失败，请刷新重试。</p>
+                    </div>\`;
+            }
+        }
+
+        function renderAccountCards(accounts) {
+            const container = document.getElementById('account-container');
+            container.innerHTML = ''; 
+
+            if(accounts.length === 0) {
+                container.innerHTML = \`<div class="col-span-full text-center py-16 text-gray-500"><i class="fa-solid fa-box-archive text-4xl mb-3 text-indigo-200"></i><p>账号库为空，点击右上角“添加账号”记录您的数字资产！</p></div>\`;
+                return;
+            }
+
+            // 按地区字母排序
+            accounts.sort((a, b) => (a.region || '').localeCompare(b.region || ''));
+
+            accounts.forEach(acc => {
+                const remarkHTML = acc.remark ? \`<div class="bg-indigo-50/60 rounded-lg p-2.5 mt-4 text-xs text-gray-700 border border-indigo-100/60 break-words leading-relaxed whitespace-pre-wrap"><i class="fa-regular fa-comment-dots mr-1.5 text-indigo-400"></i>\${escapeHtml(acc.remark)}</div>\` : '';
+                
+                const cardHTML = \`
+                    <div class="glass-card rounded-2xl p-6 relative overflow-hidden group flex flex-col h-full border-t-4 border-t-indigo-400">
+                        
+                        <div class="absolute top-4 right-4 flex gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-300 z-20 bg-white/80 p-1.5 rounded-full backdrop-blur-md border border-white/60 shadow-sm">
+                            <button onclick="openEditAccountModal('\${acc.id}')" class="text-indigo-600 hover:text-white hover:bg-indigo-500 bg-white w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm" title="编辑账号">
+                                <i class="fa-solid fa-pen text-sm"></i>
+                            </button>
+                            <button onclick="deleteAccount('\${acc.id}')" class="text-red-500 hover:text-white hover:bg-red-500 bg-white w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm" title="删除账号">
+                                <i class="fa-solid fa-trash-can text-sm"></i>
+                            </button>
+                        </div>
+
+                        <div class="pr-20 mb-4 flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                                <i class="fa-solid fa-map-location-dot"></i>
+                            </div>
+                            <h2 class="text-lg font-bold text-gray-900 truncate" title="\${escapeHtml(acc.region)}">\${escapeHtml(acc.region)}</h2>
+                        </div>
+                        
+                        <div class="flex flex-col gap-3">
+                            <!-- 账号显示区 -->
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">账户/用户名</label>
+                                <div class="font-mono text-sm bg-white/60 px-3 py-2.5 rounded-lg flex justify-between items-center border border-gray-100 shadow-sm">
+                                    <span class="truncate pr-2 text-gray-800">\${escapeHtml(acc.account)}</span>
+                                    <button onclick="copyToClipboard('\${escapeHtml(acc.account)}', '账户')" class="text-gray-400 hover:text-indigo-600 transition-colors shrink-0" title="复制账号">
+                                        <i class="fa-regular fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- 密码显示区 -->
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">密码</label>
+                                <div class="font-mono text-sm bg-white/60 px-3 py-2.5 rounded-lg flex justify-between items-center border border-gray-100 shadow-sm">
+                                    <span id="pwd-val-\${acc.id}" data-pwd="\${escapeHtml(acc.password)}" class="truncate pr-2 text-gray-800 \${acc.password ? '' : 'text-gray-400 italic'}">\${acc.password ? '••••••••' : '未设置'}</span>
+                                    <div class="flex gap-3 shrink-0 \${!acc.password ? 'hidden' : ''}">
+                                        <button onclick="toggleDisplayPassword('\${acc.id}')" class="text-gray-400 hover:text-indigo-600 transition-colors" title="显示/隐藏密码">
+                                            <i id="pwd-icon-\${acc.id}" class="fa-solid fa-eye-slash"></i>
+                                        </button>
+                                        <button onclick="copyToClipboard(document.getElementById('pwd-val-\${acc.id}').getAttribute('data-pwd'), '密码')" class="text-gray-400 hover:text-indigo-600 transition-colors" title="复制密码">
+                                            <i class="fa-regular fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        \${remarkHTML}
+                    </div>
+                \`;
+                container.innerHTML += cardHTML;
+            });
+        }
+
+        function openAccountModal() {
+            editingAccountId = null;
+            document.getElementById('accountModalTitle').innerHTML = '<i class="fa-solid fa-vault text-indigo-600"></i> 新增账号';
+            const modal = document.getElementById('accountModal');
+            const content = document.getElementById('accountModalContent');
+            document.getElementById('accountForm').reset();
+            
+            // 确保密码框处于隐藏状态
+            document.getElementById('accPassword').type = "password";
+            document.getElementById('accPwdIcon').className = "fa-solid fa-eye-slash";
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function openEditAccountModal(id) {
+            const acc = accountData.find(a => a.id === id);
+            if (!acc) return;
+            
+            editingAccountId = id;
+            document.getElementById('accountModalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square text-indigo-600"></i> 编辑账号';
+            
+            document.getElementById('accRegion').value = acc.region || '';
+            document.getElementById('accAccount').value = acc.account || '';
+            document.getElementById('accPassword').value = acc.password || '';
+            document.getElementById('accRemark').value = acc.remark || '';
+            
+            document.getElementById('accPassword').type = "password";
+            document.getElementById('accPwdIcon').className = "fa-solid fa-eye-slash";
+
+            const modal = document.getElementById('accountModal');
+            const content = document.getElementById('accountModalContent');
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeAccountModal() {
+            const modal = document.getElementById('accountModal');
+            const content = document.getElementById('accountModalContent');
+            
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                editingAccountId = null;
+            }, 300); 
+        }
+
+        async function submitAccountForm(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitAccountBtn');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>保存中...';
+            btn.disabled = true;
+
+            const payload = {
+                region: document.getElementById('accRegion').value,
+                account: document.getElementById('accAccount').value,
+                password: document.getElementById('accPassword').value,
+                remark: document.getElementById('accRemark').value
+            };
+
+            if (editingAccountId) {
+                payload.id = editingAccountId;
+            }
+
+            try {
+                const response = await fetch(WORKER_API_ACCOUNT_URL, {
+                    method: editingAccountId ? 'PUT' : 'POST', 
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify(payload)
+                });
+                
+                if (response.status === 401) { logout(); return; }
+                if (response.ok) {
+                    closeAccountModal();
+                    showToast(editingAccountId ? "账号修改成功" : "账号添加成功");
+                    await fetchAccountData(); 
+                } else {
+                    alert("保存失败，请检查数据。");
+                }
+            } catch (error) {
+                alert("网络错误，保存失败。");
+            } finally {
+                btn.innerHTML = '保存账号';
+                btn.disabled = false;
+            }
+        }
+
+        function deleteAccount(id) {
+            openConfirmModal({
+                title: '确认删除账号',
+                message: '确定要删除这个账号记录吗？此操作无法恢复。',
+                btnText: '<i class="fa-solid fa-trash-can"></i> 确定删除',
+                btnClass: 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/30',
+                iconBgClass: 'bg-red-50/80 border border-red-100',
+                iconClass: 'fa-trash-can text-3xl text-red-500',
+                onConfirm: async () => {
+                    const btn = document.getElementById('confirmActionBtn');
+                    const origText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 删除中...';
+                    btn.disabled = true;
+                    
+                    try {
+                        const response = await fetch(WORKER_API_ACCOUNT_URL, {
+                            method: 'DELETE',
+                            headers: getAuthHeaders(),
+                            body: JSON.stringify({ id: id })
+                        });
+                        
+                        if (response.status === 401) { logout(); return; }
+                        if (response.ok) {
+                            closeConfirmModal();
+                            showToast("账号已删除");
+                            await fetchAccountData(); 
+                        } else {
+                            alert("删除失败。");
+                            btn.innerHTML = origText;
+                            btn.disabled = false;
+                        }
+                    } catch (error) {
+                        alert("网络错误，删除失败。");
+                        btn.innerHTML = origText;
+                        btn.disabled = false;
+                    }
+                }
+            });
+        }
+
 
         // ================= 统一确认弹窗功能 =================
         function openConfirmModal(options) {
@@ -639,7 +1077,6 @@ const HTML_CONTENT = `<!DOCTYPE html>
             }, 300); 
         }
 
-        // ================= 重构后的续期与删除功能 =================
         function renewEsim(id, cycle) {
             if (!cycle || cycle === 0) {
                 alert("该卡片未设置保号周期，无法自动计算日期。请直接点击编辑修改。");
@@ -676,6 +1113,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
                         if (response.status === 401) { logout(); return; }
                         if (response.ok) {
                             closeConfirmModal();
+                            showToast("卡片已顺延续期");
                             await fetchEsimData(); 
                         } else {
                             alert("续期失败。");
@@ -715,6 +1153,7 @@ const HTML_CONTENT = `<!DOCTYPE html>
                         if (response.status === 401) { logout(); return; }
                         if (response.ok) {
                             closeConfirmModal();
+                            showToast("卡片已删除");
                             await fetchEsimData(); 
                         } else {
                             alert("删除失败。");
@@ -758,7 +1197,6 @@ const HTML_CONTENT = `<!DOCTYPE html>
             document.getElementById('simRemark').value = sim.remark || '';
             document.getElementById('simExpire').value = sim.expireDate || '';
             
-            // 填充提醒设置数据
             document.getElementById('simNotifyAdvance').value = sim.notifyAdvance !== undefined ? sim.notifyAdvance : '';
             document.getElementById('simNotifyInterval').value = sim.notifyInterval !== undefined ? sim.notifyInterval : '';
             document.getElementById('simNotifyCount').value = sim.notifyCount !== undefined ? sim.notifyCount : '';
@@ -826,7 +1264,7 @@ export default {
           if (!tgChat) missingVars.push("TG_CHAT_ID");
           return new Response(JSON.stringify({ 
               success: false, 
-              message: `环境缺失：缺少 ${missingVars.join(' 和 ')}。请前往 Cloudflare 的 KV 数据库中手动添加这两个键值对即可彻底解决！` 
+              message: \`环境缺失：缺少 \${missingVars.join(' 和 ')}。请前往 Cloudflare 的 KV 数据库中手动添加这两个键值对即可彻底解决！\` 
           }), { status: 500, headers: corsHeaders });
         }
         
@@ -835,8 +1273,8 @@ export default {
         await env.ESIM_DB.put("admin_auth_code", code, { expirationTtl: 300 });
         await env.ESIM_DB.put("admin_auth_attempts", "0", { expirationTtl: 300 }); 
 
-        const text = `🔐 <b>【eSIM 看板安全验证】</b>\n\n有人正在尝试登录您的网页版数据面板。\n\n您的动态登录验证码是：<code>${code}</code>\n\n<i>(该验证码 5 分钟内有效。如非本人操作，请忽略，系统已开启防爆破保护)</i>`;
-        const tgUrl = `https://api.telegram.org/bot${tgToken}/sendMessage`;
+        const text = \`🔐 <b>【eSIM 看板安全验证】</b>\n\n有人正在尝试登录您的网页版数据面板。\n\n您的动态登录验证码是：<code>\${code}</code>\n\n<i>(该验证码 5 分钟内有效。如非本人操作，请忽略，系统已开启防爆破保护)</i>\`;
+        const tgUrl = \`https://api.telegram.org/bot\${tgToken}/sendMessage\`;
         const tgRes = await fetch(tgUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -880,23 +1318,20 @@ export default {
           await env.ESIM_DB.put("admin_auth_attempts", attempts.toString(), { expirationTtl: 300 });
           await new Promise(resolve => setTimeout(resolve, 1000)); 
           
-          return new Response(JSON.stringify({ success: false, message: `验证码错误！剩余尝试次数: ${5 - attempts} 次` }), { status: 401, headers: corsHeaders });
+          return new Response(JSON.stringify({ success: false, message: \`验证码错误！剩余尝试次数: \${5 - attempts} 次\` }), { status: 401, headers: corsHeaders });
         }
       } catch (err) {
         return new Response(JSON.stringify({ success: false, message: "校验失败" }), { status: 500, headers: corsHeaders });
       }
     }
 
+    // ================= eSIM 路由 =================
     if (path === "/api/esims") {
       const reqToken = request.headers.get("Authorization");
-      if (!reqToken) {
-        return new Response(JSON.stringify({ error: "Unauthorized: Missing Token" }), { status: 401, headers: corsHeaders });
-      }
+      if (!reqToken) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
       
       const isValidSession = await env.ESIM_DB.get("session_token_" + reqToken);
-      if (!isValidSession) {
-        return new Response(JSON.stringify({ error: "Unauthorized: Invalid or Expired Token" }), { status: 401, headers: corsHeaders });
-      }
+      if (!isValidSession) return new Response(JSON.stringify({ error: "Invalid Token" }), { status: 401, headers: corsHeaders });
 
       let esims;
       try {
@@ -957,6 +1392,68 @@ export default {
       }
     }
 
+    // ================= 账号库 路由 =================
+    if (path === "/api/accounts") {
+      const reqToken = request.headers.get("Authorization");
+      if (!reqToken) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+      
+      const isValidSession = await env.ESIM_DB.get("session_token_" + reqToken);
+      if (!isValidSession) return new Response(JSON.stringify({ error: "Invalid Token" }), { status: 401, headers: corsHeaders });
+
+      let accounts;
+      try {
+        accounts = await env.ESIM_DB.get("account_list", { type: "json" });
+        if (!accounts) accounts = []; 
+      } catch (err) {
+        return new Response(JSON.stringify({ error: "KV 未绑定" }), { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } });
+      }
+
+      if (request.method === "GET") {
+        return new Response(JSON.stringify(accounts), { headers: { "Content-Type": "application/json", ...corsHeaders } });
+      }
+
+      if (request.method === "POST") {
+        try {
+          const newAcc = await request.json();
+          if (!newAcc.region || !newAcc.account) return new Response(JSON.stringify({ success: false, message: "参数错误" }), { status: 400, headers: corsHeaders });
+          newAcc.id = 'acc_' + Date.now().toString(); 
+          accounts.push(newAcc);
+          await env.ESIM_DB.put("account_list", JSON.stringify(accounts)); 
+          return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
+        } catch (err) { return new Response(JSON.stringify({ success: false }), { status: 400, headers: corsHeaders }); }
+      }
+
+      if (request.method === "PUT") {
+        try {
+          const { id, region, account, password, remark } = await request.json();
+          let found = false;
+          accounts = accounts.map(acc => {
+            if (acc.id === id) { 
+                found = true; 
+                if (region !== undefined) acc.region = region;
+                if (account !== undefined) acc.account = account;
+                if (password !== undefined) acc.password = password;
+                if (remark !== undefined) acc.remark = remark;
+                return acc; 
+            }
+            return acc;
+          });
+          if (!found) return new Response(JSON.stringify({ success: false, message: "未找到记录" }), { status: 404, headers: corsHeaders });
+          await env.ESIM_DB.put("account_list", JSON.stringify(accounts)); 
+          return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
+        } catch (err) { return new Response(JSON.stringify({ success: false }), { status: 400, headers: corsHeaders }); }
+      }
+
+      if (request.method === "DELETE") {
+        try {
+          const { id } = await request.json();
+          accounts = accounts.filter(acc => acc.id !== id);
+          await env.ESIM_DB.put("account_list", JSON.stringify(accounts)); 
+          return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
+        } catch (err) { return new Response(JSON.stringify({ success: false }), { status: 400, headers: corsHeaders }); }
+      }
+    }
+
     return new Response("404 Not Found", { status: 404 });
   },
 
@@ -985,9 +1482,9 @@ export default {
       const diffTime = expDate - localToday;
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
-      const cycleText = sim.cycle ? `${sim.cycle}天` : '未设置';
-      const remarkText = sim.remark ? `\n📝 备注: ${sim.remark}` : ''; 
-      const platformsText = sim.platforms ? `\n🌐 平台: ${sim.platforms}` : ''; 
+      const cycleText = sim.cycle ? \`\${sim.cycle}天\` : '未设置';
+      const remarkText = sim.remark ? \`\n📝 备注: \${sim.remark}\` : ''; 
+      const platformsText = sim.platforms ? \`\n🌐 平台: \${sim.platforms}\` : ''; 
 
       // 动态解析自定义提醒规则，采用极其高效的数学推演判定算法（无需在数据库读写记录次数的脏状态）
       const advance = sim.notifyAdvance !== undefined && sim.notifyAdvance !== "" ? parseInt(sim.notifyAdvance) : 15;
@@ -1008,20 +1505,20 @@ export default {
             }
 
             if (shouldNotify) {
-                let notifyProgress = maxCount > 0 ? ` (第 ${currentCount}/${maxCount} 次)` : '';
-                messages.push(`⚠️ 【eSIM 保号提醒】${notifyProgress}\n📱 卡名: ${sim.name}\n📞 号码: ${sim.number || '未填写'}\n🔄 周期: ${cycleText}\n📅 到期: ${sim.expireDate}${remarkText}${platformsText}\n⏳ 剩余: ${diffDays} 天！\n👉 请尽快处理续期！`);
+                let notifyProgress = maxCount > 0 ? \` (第 \${currentCount}/\${maxCount} 次)\` : '';
+                messages.push(\`⚠️ 【eSIM 保号提醒】\${notifyProgress}\n📱 卡名: \${sim.name}\n📞 号码: \${sim.number || '未填写'}\n🔄 周期: \${cycleText}\n📅 到期: \${sim.expireDate}\${remarkText}\${platformsText}\n⏳ 剩余: \${diffDays} 天！\n👉 请尽快处理续期！\`);
             }
         }
       } else if (diffDays === 0) {
-        messages.push(`🚨 【eSIM 紧急提醒】\n📱 卡名: ${sim.name} 今天到期！${remarkText}${platformsText}`);
+        messages.push(\`🚨 【eSIM 紧急提醒】\n📱 卡名: \${sim.name} 今天到期！\${remarkText}\${platformsText}\`);
       } else if (diffDays < 0 && Math.abs(diffDays) % 7 === 0) {
-        messages.push(`❌ 【eSIM 停机警告】\n📱 卡名: ${sim.name} 已过期 ${Math.abs(diffDays)} 天。${remarkText}${platformsText}`);
+        messages.push(\`❌ 【eSIM 停机警告】\n📱 卡名: \${sim.name} 已过期 \${Math.abs(diffDays)} 天。\${remarkText}\${platformsText}\`);
       }
     });
 
     if (messages.length > 0 && tgToken && tgChat) {
       const text = messages.join("\n\n---\n\n");
-      const tgUrl = `https://api.telegram.org/bot${tgToken}/sendMessage`;
+      const tgUrl = \`https://api.telegram.org/bot\${tgToken}/sendMessage\`;
       await fetch(tgUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
